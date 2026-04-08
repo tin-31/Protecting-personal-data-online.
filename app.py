@@ -6,7 +6,7 @@ from groq import Groq
 # CẤU HÌNH TRANG & KẾT NỐI
 # ==========================================
 st.set_page_config(page_title="Hệ Sinh Thái An Toàn Không Gian Mạng", page_icon="🛡️", layout="wide")
-st.title("🛡️ Nền Tảng Đánh Giá & Tư Vấn An Toàn Thông Tin")
+# [XÓA] Đã xóa tiêu đề chính st.title() ở đây để làm gọn giao diện
 
 # --- KẾT NỐI SUPABASE ---
 @st.cache_resource
@@ -33,12 +33,13 @@ client = init_groq_client()
 # ==========================================
 # GIAO DIỆN CHÍNH
 # ==========================================
-tab1, tab2 = st.tabs(["📊 Đánh giá Rủi ro Đa chiều", "🤖 Trợ lý AI (Siêu tốc)"])
+# [XÓA] Đã xóa chữ "Đa chiều" và "(Siêu tốc)" trong tên các Tab
+tab1, tab2 = st.tabs(["📊 Đánh giá Rủi ro", "🤖 Trợ lý AI"])
 
-# --- TAB 1: CÔNG CỤ ĐÁNH GIÁ RỦI RO (PHIÊN BẢN CẢI TIẾN) ---
+# --- TAB 1: CÔNG CỤ ĐÁNH GIÁ RỦI RO ---
 with tab1:
     st.header("Chẩn đoán Nguy cơ Bảo mật Cá nhân")
-    st.markdown("Hệ thống đánh giá dựa trên 8 chỉ số hành vi an ninh mạng chuẩn quốc tế.")
+    # [XÓA] Đã xóa dòng st.markdown mô tả 8 chỉ số
     
     with st.form("risk_assessment_form"):
         st.subheader("1. Quản lý Danh tính & Thiết bị")
@@ -81,24 +82,16 @@ with tab1:
         submitted = st.form_submit_button("Tiến hành Phân tích Dữ liệu")
         
         if submitted:
-            # THUẬT TOÁN TÍNH ĐIỂM CÓ TRỌNG SỐ (WEIGHTED SCORING)
-            # Điểm càng cao = Rủi ro càng cao (0 - 100)
+            # THUẬT TOÁN TÍNH ĐIỂM CÓ TRỌNG SỐ
             score = 100
-            
-            # Trừ điểm dựa trên hành vi tốt (Trọng số khác nhau)
             if pw_complexity == "Bao gồm chữ hoa, số và ký tự đặc biệt (@,#,...)": score -= 15
             elif pw_complexity == "Kết hợp chữ và số": score -= 5
-            
             if update_habit == "Luôn cập nhật ngay khi có thông báo": score -= 10
-            
             if two_fa == "Bật cho tất cả tài khoản quan trọng (Email, Ngân hàng)": score -= 25
             elif two_fa == "Chỉ dùng cho Facebook/Zalo": score -= 10
-            
             if phishing_skill == "Báo cáo spam và tuyệt đối không click": score -= 15
-            
             if public_wifi == "Sử dụng VPN hoặc 4G để bảo mật": score -= 20
-            elif public_wifi == "Chỉ lướt mạng xã hội/Đọc tin tức": score -= 10
-            
+            elif public_wifi == "Chỉ lướt web đọc tin tức": score -= 10
             if piracy_habit == "Không bao giờ (Chỉ dùng nguồn chính thống)": score -= 15
             
             risk_score = max(0, min(100, score))
@@ -114,7 +107,7 @@ with tab1:
             else:
                 st.success("✅ AN TOÀN: Bạn có kỹ năng phòng thủ số rất tốt.")
             
-            # Lưu dữ liệu nghiên cứu vào Supabase
+            # Lưu dữ liệu nghiên cứu
             if supabase:
                 try:
                     supabase.table('survey_results').insert({
@@ -124,14 +117,15 @@ with tab1:
                         "wifi_habit": public_wifi,
                         "risk_score": risk_score
                     }).execute()
-                    st.toast("Dữ liệu đã được mã hóa và lưu trữ phục vụ nghiên cứu!", icon="🛡️")
+                    # [XÓA] Đã xóa st.toast thông báo thành công
                 except:
-                    st.error("Lỗi đồng bộ Cloud.")
+                    # [XÓA] Đã xóa st.error lỗi đồng bộ
+                    pass
 
-# --- TAB 2: CHATBOT TƯ VẤN (SIÊU TỐC) ---
+# --- TAB 2: CHATBOT TƯ VẤN ---
 with tab2:
     st.header("Trợ lý An ninh mạng AI")
-    st.markdown("Tư vấn giải pháp bảo mật dựa trên lập luận học thuật.")
+    # [XÓA] Đã xóa dòng st.markdown mô tả kết nối Point-to-Point
     
     if not client:
         st.error("⚠️ Chưa cấu hình GROQ_API_KEY.")
