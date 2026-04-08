@@ -1,6 +1,6 @@
 import streamlit as st
 from supabase import create_client
-import google.generativeai as genai
+from groq import Groq
 
 # ==========================================
 # CẤU HÌNH TRANG & KẾT NỐI
@@ -20,35 +20,21 @@ def init_connection():
 
 supabase = init_connection()
 
-# --- KHỞI TẠO AI MODEL (TỐI ƯU HÓA BẰNG CACHE) ---
-# Điểm mấu chốt để tốc độ trở nên siêu tốc nằm ở đây
+# --- KHỞI TẠO GROQ API (TỐC ĐỘ LPU SIÊU TỐC) ---
 @st.cache_resource
-def init_ai_model():
-    api_key = st.secrets.get("GOOGLE_API_KEY")
+def init_groq_client():
+    api_key = st.secrets.get("GROQ_API_KEY")
     if not api_key:
         return None
-        
-    genai.configure(api_key=api_key)
-    try:
-        # Ưu tiên 1: Quét tìm Flash (Chỉ chạy 1 lần duy nhất)
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods and 'flash' in m.name.lower():
-                return genai.GenerativeModel(m.name)
-                
-        # Ưu tiên 2: Dự phòng
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                return genai.GenerativeModel(m.name)
-    except Exception as e:
-        return None
+    return Groq(api_key=api_key)
 
-model = init_ai_model()
+client = init_groq_client()
 
 
 # ==========================================
 # GIAO DIỆN CHÍNH
 # ==========================================
-tab1, tab2 = st.tabs(["📊 Đánh giá Rủi ro", "🤖 Trợ lý AI (Tốc độ tối đa)"])
+tab1, tab2 = st.tabs(["📊 Đánh giá Rủi ro", "🤖 Trợ lý AI (Tốc độ ánh sáng)"])
 
 # --- TAB 1: CÔNG CỤ ĐÁNH GIÁ RỦI RO ---
 with tab1:
@@ -106,13 +92,13 @@ with tab1:
                 except Exception as e:
                     st.error("Lỗi kết nối cơ sở dữ liệu. Kết quả chỉ hiển thị cục bộ.")
 
-# --- TAB 2: CHATBOT TƯ VẤN (NATIVE SDK + STREAM) ---
+# --- TAB 2: CHATBOT TƯ VẤN (GROQ API + LLAMA 3) ---
 with tab2:
     st.header("Trợ lý An ninh mạng AI")
-    st.markdown("Hệ thống kết nối trực tiếp (Point-to-Point) mang lại tốc độ phản hồi thời gian thực.")
+    st.markdown("Hệ thống kết nối trực tiếp với chip xử lý LPU của Groq, mang lại tốc độ phản hồi tính bằng mili-giây.")
     
-    if not model:
-        st.error("⚠️ Lỗi cấu hình API. Vui lòng kiểm tra lại GOOGLE_API_KEY hoặc hệ thống Google đang bảo trì.")
+    if not client:
+        st.error("⚠️ Lỗi cấu hình API. Vui lòng kiểm tra lại GROQ_API_KEY trong Secrets.")
     else:
         if "messages" not in st.session_state:
             st.session_state.messages = []
@@ -128,16 +114,25 @@ with tab2:
 
             with st.chat_message("assistant"):
                 try:
-                    expert_prompt = f"Bạn là chuyên gia an ninh mạng. Trả lời ngắn gọn, học thuật dựa trên pháp luật Việt Nam: {prompt}"
+                    # Gọi API của Groq với mô hình Llama 3 70B siêu mạnh
+                    stream = client.chat.completions.create(
+                        model="llama3-70b-8192",
+                        messages=[
+                            {"role": "system", "content": "Bạn là một chuyên gia an ninh mạng. Trả lời ngắn gọn, lập luận chặt chẽ, học thuật và dựa trên bối cảnh pháp luật Việt Nam. Viết hoàn toàn bằng tiếng Việt."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.2,
+                        stream=True,
+                    )
                     
-                    response = model.generate_content(expert_prompt, stream=True)
-                    
+                    # Hàm bóc tách dữ liệu Stream từ Groq
                     def stream_generator():
-                        for chunk in response:
-                            yield chunk.text
-                            
+                        for chunk in stream:
+                            if chunk.choices[0].delta.content is not None:
+                                yield chunk.choices[0].delta.content
+                                
                     full_response = st.write_stream(stream_generator)
                     st.session_state.messages.append({"role": "assistant", "content": full_response})
                     
                 except Exception as e:
-                    st.error(f"Hệ thống đang bảo trì: Quota bị vượt hoặc lỗi mạng. {str(e)}")
+                    st.error(f"⚠️ Hệ thống đang bảo trì: {str(e)}")
