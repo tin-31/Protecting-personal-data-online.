@@ -8,6 +8,7 @@ import google.generativeai as genai
 st.set_page_config(page_title="Hệ Sinh Thái An Toàn Không Gian Mạng", page_icon="🛡️", layout="wide")
 st.title("🛡️ Nền Tảng Đánh Giá & Tư Vấn An Toàn Thông Tin")
 
+# --- KẾT NỐI SUPABASE ---
 @st.cache_resource
 def init_connection():
     try:
@@ -19,30 +20,30 @@ def init_connection():
 
 supabase = init_connection()
 
-# Khởi tạo API Google ngay từ đầu
-api_key = st.secrets.get("GOOGLE_API_KEY")
-model = None
-
-if api_key:
+# --- KHỞI TẠO AI MODEL (TỐI ƯU HÓA BẰNG CACHE) ---
+# Điểm mấu chốt để tốc độ trở nên siêu tốc nằm ở đây
+@st.cache_resource
+def init_ai_model():
+    api_key = st.secrets.get("GOOGLE_API_KEY")
+    if not api_key:
+        return None
+        
     genai.configure(api_key=api_key)
-    
-    # CHIẾN THUẬT BULLETPROOF: Tự động quét và khóa mục tiêu (Model Scanner)
     try:
-        # Ưu tiên 1: Quét tìm mô hình dòng 'Flash' để đảm bảo tốc độ tên lửa
+        # Ưu tiên 1: Quét tìm Flash (Chỉ chạy 1 lần duy nhất)
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods and 'flash' in m.name.lower():
+                return genai.GenerativeModel(m.name)
+                
+        # Ưu tiên 2: Dự phòng
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods:
-                if 'flash' in m.name.lower():
-                    model = genai.GenerativeModel(m.name)
-                    break
-                    
-        # Ưu tiên 2: Phương án dự phòng (Fallback) nếu tài khoản chưa được cấp Flash
-        if model is None:
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods:
-                    model = genai.GenerativeModel(m.name)
-                    break
+                return genai.GenerativeModel(m.name)
     except Exception as e:
-        st.error(f"Lỗi truy xuất danh sách mô hình từ Google: {e}")
+        return None
+
+model = init_ai_model()
+
 
 # ==========================================
 # GIAO DIỆN CHÍNH
@@ -111,7 +112,7 @@ with tab2:
     st.markdown("Hệ thống kết nối trực tiếp (Point-to-Point) mang lại tốc độ phản hồi thời gian thực.")
     
     if not model:
-        st.error("⚠️ Lỗi cấu hình API. Vui lòng kiểm tra lại GOOGLE_API_KEY trong Secrets.")
+        st.error("⚠️ Lỗi cấu hình API. Vui lòng kiểm tra lại GOOGLE_API_KEY hoặc hệ thống Google đang bảo trì.")
     else:
         if "messages" not in st.session_state:
             st.session_state.messages = []
@@ -129,10 +130,8 @@ with tab2:
                 try:
                     expert_prompt = f"Bạn là chuyên gia an ninh mạng. Trả lời ngắn gọn, học thuật dựa trên pháp luật Việt Nam: {prompt}"
                     
-                    # Gọi API với cơ chế stream=True trực tiếp từ Google
                     response = model.generate_content(expert_prompt, stream=True)
                     
-                    # Hàm generator để tương thích hoàn hảo với st.write_stream
                     def stream_generator():
                         for chunk in response:
                             yield chunk.text
@@ -141,4 +140,4 @@ with tab2:
                     st.session_state.messages.append({"role": "assistant", "content": full_response})
                     
                 except Exception as e:
-                    st.error(f"Hệ thống đang bảo trì: {str(e)}")
+                    st.error(f"Hệ thống đang bảo trì: Quota bị vượt hoặc lỗi mạng. {str(e)}")
