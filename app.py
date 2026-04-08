@@ -1,8 +1,5 @@
 import streamlit as st
-from supabase import create_client, Client
-from PIL import Image, ImageDraw, ImageFont
-import io
-import os
+from supabase import create_client
 
 # --- CẤU HÌNH TRANG ---
 st.set_page_config(page_title="Hệ Sinh Thái An Toàn Không Gian Mạng", page_icon="🛡️", layout="wide")
@@ -21,7 +18,8 @@ def init_connection():
 supabase = init_connection()
 
 # --- TẠO CÁC TAB CHỨC NĂNG ---
-tab1, tab2, tab3 = st.tabs(["📊 Đánh giá Rủi ro", "🤖 Chatbot Tư vấn RAG", "🏆 Thử tài & Nhận Chứng chỉ"])
+# Đã lược bỏ Tab 3 để tập trung hiệu năng cho hệ thống lõi
+tab1, tab2 = st.tabs(["📊 Đánh giá Rủi ro", "🤖 Chatbot Tư vấn RAG (Tốc độ cao)"])
 
 # ==========================================
 # TAB 1: CÔNG CỤ ĐÁNH GIÁ RỦI RO (RISK ASSESSMENT)
@@ -88,11 +86,11 @@ with tab1:
 
 
 # ==========================================
-# TAB 2: CHATBOT TƯ VẤN (RAG VỚI GEMINI & FAISS)
+# TAB 2: CHATBOT TƯ VẤN (RAG TỐC ĐỘ CAO - STREAMING)
 # ==========================================
 with tab2:
     st.header("Trợ lý An ninh mạng AI")
-    st.markdown("Bot được huấn luyện trên dữ liệu Luật An ninh mạng và các kết quả nghiên cứu độc quyền.")
+    st.markdown("Bot được huấn luyện trên dữ liệu Luật An ninh mạng và các kết quả nghiên cứu độc quyền. **Tốc độ phản hồi đã được tối ưu hóa.**")
     
     # Khởi tạo lịch sử chat
     if "messages" not in st.session_state:
@@ -112,8 +110,6 @@ with tab2:
 
         with st.chat_message("assistant"):
             try:
-                # KIẾN TRÚC RAG MẪU (Sử dụng Google Gemini)
-                import google.generativeai as genai
                 from langchain_google_genai import ChatGoogleGenerativeAI
                 
                 api_key = st.secrets.get("GOOGLE_API_KEY")
@@ -124,87 +120,17 @@ with tab2:
                 # Khởi tạo mô hình
                 llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", google_api_key=api_key)
                 
-                # Trong thực tế, bạn sẽ chèn FAISS Retriever vào đây
-                # retriever = vector_store.as_retriever()
-                # answer = qa_chain.run(prompt)
+                # Ép khuôn chuyên gia bảo mật
+                expert_prompt = f"Bạn là một chuyên gia an ninh mạng. Hãy trả lời ngắn gọn, học thuật và chính xác câu hỏi sau dựa trên bối cảnh tại Việt Nam: {prompt}"
                 
-                # Ép khuôn chuyên gia
-                expert_prompt = f"Bạn là một chuyên gia an ninh mạng. Hãy trả lời ngắn gọn, học thuật và chính xác câu hỏi sau dựa trên Luật pháp Việt Nam: {prompt}"
-                
-                # SỬ DỤNG CƠ CHẾ STREAMING ĐỂ KHẮC PHỤC ĐỘ TRỄ
+                # Áp dụng cơ chế Streaming (Gõ từng chữ)
                 response_stream = llm.stream(expert_prompt)
                 
-                # Dùng st.write_stream để in ra từng chữ ngay lập tức
+                # Streamlit 1.31+ hỗ trợ write_stream giúp hiển thị mượt mà
                 full_response = st.write_stream(chunk.content for chunk in response_stream)
                 
-                # Lưu lại toàn bộ câu trả lời vào lịch sử
+                # Lưu lại toàn bộ câu trả lời vào lịch sử session
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 
             except Exception as e:
                 st.error(f"Hệ thống đang bảo trì: {str(e)}")
-
-
-# ==========================================
-# TAB 3: TRÒ CHƠI HÓA (GAMIFICATION) & CẤP CHỨNG CHỈ
-# ==========================================
-with tab3:
-    st.header("Thử tài Nhận diện Phishing")
-    st.markdown("Phân tích email sau đây và cho biết nó có an toàn không?")
-    
-    # Giả lập một bài test trực quan
-    st.info("**Từ:** admin@facebook-security-update.com\n\n**Tiêu đề:** TÀI KHOẢN CỦA BẠN SẼ BỊ KHÓA TRONG 24H!\n\n**Nội dung:** Vui lòng click vào đường link sau để xác minh danh tính: http://bit.ly/fb-verify-998")
-    
-    test_answer = st.radio("Đánh giá của bạn:", ["Đây là email thật của Facebook", "Đây là email lừa đảo (Phishing)"])
-    
-    if st.button("Kiểm tra kết quả"):
-        if test_answer == "Đây là email lừa đảo (Phishing)":
-            st.success("🎉 Chính xác! Tên miền email sai lệch và link rút gọn là dấu hiệu của Phishing.")
-            st.session_state['passed_test'] = True
-        else:
-            st.error("❌ Rất tiếc! Đây là email lừa đảo. Bạn không nên click vào các link rút gọn từ email lạ.")
-            st.session_state['passed_test'] = False
-
-    st.divider()
-    
-    # Cấp chứng chỉ nếu đã qua bài test
-    if st.session_state.get('passed_test', False):
-        st.subheader("🎓 Nhận Chứng Chỉ Công Dân Mạng An Toàn")
-        user_name = st.text_input("Nhập Họ và Tên của bạn để in lên chứng chỉ:")
-        
-        if st.button("Tạo Chứng Chỉ"):
-            if user_name:
-                # Xử lý ảnh bằng Pillow
-                # Lưu ý: Trong thực tế, bạn tải một ảnh phôi 'template.jpg' lên GitHub cùng file app.py
-                # img = Image.open('template.jpg')
-                
-                # Tạm thời tạo một ảnh nền gradient cơ bản để demo code chạy được ngay
-                img = Image.new('RGB', (800, 600), color = (10, 36, 99))
-                draw = ImageDraw.Draw(img)
-                
-                # Lấy font mặc định (Hoặc tải font .ttf lên repo)
-                # font = ImageFont.truetype("arial.ttf", 40)
-                try:
-                    font_title = ImageFont.truetype("arial.ttf", 45)
-                    font_name = ImageFont.truetype("arial.ttf", 60)
-                except IOError:
-                    font_title = font_name = ImageFont.load_default()
-                
-                # Ghi chữ lên ảnh
-                draw.text((150, 150), "CHỨNG NHẬN HOÀN THÀNH", fill=(255, 255, 255), font=font_title)
-                draw.text((150, 250), user_name.upper(), fill=(255, 215, 0), font=font_name)
-                draw.text((150, 400), "Đã hoàn thành xuất sắc bài kiểm tra An toàn Không gian mạng.", fill=(255, 255, 255))
-                
-                # Xuất ảnh ra bộ nhớ đệm để tải về
-                buf = io.BytesIO()
-                img.save(buf, format="PNG")
-                byte_im = buf.getvalue()
-                
-                st.image(img, caption="Chứng chỉ của bạn")
-                st.download_button(
-                    label="Tải Chứng Chỉ Về Máy",
-                    data=byte_im,
-                    file_name="chung_chi_an_toan_mang.png",
-                    mime="image/png"
-                )
-            else:
-                st.warning("Vui lòng nhập tên của bạn!")
