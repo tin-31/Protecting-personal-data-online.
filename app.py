@@ -1,11 +1,13 @@
 import streamlit as st
 from supabase import create_client
+import google.generativeai as genai
 
-# --- CẤU HÌNH TRANG ---
+# ==========================================
+# CẤU HÌNH TRANG & KẾT NỐI
+# ==========================================
 st.set_page_config(page_title="Hệ Sinh Thái An Toàn Không Gian Mạng", page_icon="🛡️", layout="wide")
 st.title("🛡️ Nền Tảng Đánh Giá & Tư Vấn An Toàn Thông Tin")
 
-# --- KẾT NỐI SUPABASE (CƠ SỞ DỮ LIỆU) ---
 @st.cache_resource
 def init_connection():
     try:
@@ -17,13 +19,21 @@ def init_connection():
 
 supabase = init_connection()
 
-# --- TẠO CÁC TAB CHỨC NĂNG ---
-# Đã lược bỏ Tab 3 để tập trung hiệu năng cho hệ thống lõi
-tab1, tab2 = st.tabs(["📊 Đánh giá Rủi ro", "🤖 Chatbot Tư vấn RAG (Tốc độ cao)"])
+# Khởi tạo API Google ngay từ đầu
+api_key = st.secrets.get("GOOGLE_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+    # Sử dụng thẳng bản Flash siêu tốc
+    model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    model = None
 
 # ==========================================
-# TAB 1: CÔNG CỤ ĐÁNH GIÁ RỦI RO (RISK ASSESSMENT)
+# GIAO DIỆN CHÍNH
 # ==========================================
+tab1, tab2 = st.tabs(["📊 Đánh giá Rủi ro", "🤖 Trợ lý AI (Tốc độ tối đa)"])
+
+# --- TAB 1: CÔNG CỤ ĐÁNH GIÁ RỦI RO ---
 with tab1:
     st.header("Kiểm tra mức độ an toàn tài khoản của bạn")
     st.markdown("Bài test này giúp đánh giá nguy cơ rò rỉ dữ liệu cá nhân dựa trên thói quen sử dụng internet.")
@@ -46,7 +56,6 @@ with tab1:
         submitted = st.form_submit_button("Chẩn đoán Rủi ro")
         
         if submitted:
-            # Thuật toán chấm điểm rủi ro cơ bản
             risk_score = 100
             if pw_habit == "Mật khẩu ngẫu nhiên, khác nhau cho từng web": risk_score -= 30
             elif pw_habit == "Có đổi nhưng vẫn dùng tên/ngày sinh": risk_score -= 10
@@ -57,7 +66,6 @@ with tab1:
             if public_wifi == "Sử dụng VPN để bảo mật": risk_score -= 30
             elif public_wifi == "Chỉ lướt web đọc tin tức": risk_score -= 10
             
-            # Đảm bảo điểm nằm trong khoảng 0-100
             risk_score = max(0, min(100, risk_score))
             
             st.progress(risk_score / 100)
@@ -68,7 +76,6 @@ with tab1:
             else:
                 st.success(f"✅ An toàn: {risk_score}% - Bạn có kỹ năng bảo vệ dữ liệu rất tốt!")
             
-            # Gửi dữ liệu lên Supabase để làm Data nghiên cứu
             if supabase:
                 try:
                     data, count = supabase.table('survey_results').insert({
@@ -81,56 +88,41 @@ with tab1:
                     st.toast("Đã lưu dữ liệu nghiên cứu ẩn danh thành công!", icon="✅")
                 except Exception as e:
                     st.error("Lỗi kết nối cơ sở dữ liệu. Kết quả chỉ hiển thị cục bộ.")
-            else:
-                st.info("Chưa cấu hình Supabase API Key. Dữ liệu không được lưu trữ.")
 
-
-# ==========================================
-# TAB 2: CHATBOT TƯ VẤN (RAG TỐC ĐỘ CAO - STREAMING)
-# ==========================================
+# --- TAB 2: CHATBOT TƯ VẤN (NATIVE SDK + STREAM) ---
 with tab2:
     st.header("Trợ lý An ninh mạng AI")
-    st.markdown("Bot được huấn luyện trên dữ liệu Luật An ninh mạng và các kết quả nghiên cứu độc quyền. **Tốc độ phản hồi đã được tối ưu hóa.**")
+    st.markdown("Hệ thống kết nối trực tiếp (Point-to-Point) mang lại tốc độ phản hồi thời gian thực.")
     
-    # Khởi tạo lịch sử chat
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    if not model:
+        st.error("⚠️ Lỗi cấu hình API. Vui lòng kiểm tra lại GOOGLE_API_KEY trong Secrets.")
+    else:
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
 
-    # Hiển thị lịch sử
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-    # Xử lý input người dùng
-    if prompt := st.chat_input("Nhập câu hỏi của bạn về an toàn thông tin..."):
-        # Thêm câu hỏi vào UI
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+        if prompt := st.chat_input("Nhập câu hỏi của bạn về an toàn thông tin..."):
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
 
-        with st.chat_message("assistant"):
-            try:
-                from langchain_google_genai import ChatGoogleGenerativeAI
-                
-                api_key = st.secrets.get("GOOGLE_API_KEY")
-                if not api_key:
-                    st.warning("⚠️ Hệ thống Chatbot đang tạm ngưng do chưa cấu hình GOOGLE_API_KEY trong Streamlit Secrets.")
-                    st.stop()
+            with st.chat_message("assistant"):
+                try:
+                    expert_prompt = f"Bạn là chuyên gia an ninh mạng. Trả lời ngắn gọn, học thuật dựa trên pháp luật Việt Nam: {prompt}"
                     
-                # Khởi tạo mô hình
-                llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
-                
-                # Ép khuôn chuyên gia bảo mật
-                expert_prompt = f"Bạn là một chuyên gia an ninh mạng. Hãy trả lời ngắn gọn, học thuật và chính xác câu hỏi sau dựa trên bối cảnh tại Việt Nam: {prompt}"
-                
-                # Áp dụng cơ chế Streaming (Gõ từng chữ)
-                response_stream = llm.stream(expert_prompt)
-                
-                # Streamlit 1.31+ hỗ trợ write_stream giúp hiển thị mượt mà
-                full_response = st.write_stream(chunk.content for chunk in response_stream)
-                
-                # Lưu lại toàn bộ câu trả lời vào lịch sử session
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-                
-            except Exception as e:
-                st.error(f"Hệ thống đang bảo trì: {str(e)}")
+                    # Gọi API với cơ chế stream=True trực tiếp từ Google
+                    response = model.generate_content(expert_prompt, stream=True)
+                    
+                    # Hàm generator để tương thích hoàn hảo với st.write_stream
+                    def stream_generator():
+                        for chunk in response:
+                            yield chunk.text
+                            
+                    full_response = st.write_stream(stream_generator)
+                    st.session_state.messages.append({"role": "assistant", "content": full_response})
+                    
+                except Exception as e:
+                    st.error(f"Hệ thống đang bảo trì: {str(e)}")
