@@ -128,12 +128,17 @@ with tab2:
                 # retriever = vector_store.as_retriever()
                 # answer = qa_chain.run(prompt)
                 
-                # Tạm thời gọi trực tiếp LLM với System Prompt ép khuôn chuyên gia
+                # Ép khuôn chuyên gia
                 expert_prompt = f"Bạn là một chuyên gia an ninh mạng. Hãy trả lời ngắn gọn, học thuật và chính xác câu hỏi sau dựa trên Luật pháp Việt Nam: {prompt}"
-                response = llm.invoke(expert_prompt)
                 
-                st.markdown(response.content)
-                st.session_state.messages.append({"role": "assistant", "content": response.content})
+                # SỬ DỤNG CƠ CHẾ STREAMING ĐỂ KHẮC PHỤC ĐỘ TRỄ
+                response_stream = llm.stream(expert_prompt)
+                
+                # Dùng st.write_stream để in ra từng chữ ngay lập tức
+                full_response = st.write_stream(chunk.content for chunk in response_stream)
+                
+                # Lưu lại toàn bộ câu trả lời vào lịch sử
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
                 
             except Exception as e:
                 st.error(f"Hệ thống đang bảo trì: {str(e)}")
