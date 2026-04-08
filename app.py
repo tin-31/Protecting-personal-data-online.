@@ -118,7 +118,7 @@ with tab2:
                     st.stop()
                     
                 # Khởi tạo mô hình
-                llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", google_api_key=api_key)
+                llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
                 
                 # Ép khuôn chuyên gia bảo mật
                 expert_prompt = f"Bạn là một chuyên gia an ninh mạng. Hãy trả lời ngắn gọn, học thuật và chính xác câu hỏi sau dựa trên bối cảnh tại Việt Nam: {prompt}"
