@@ -92,7 +92,7 @@ with tab1:
                 except Exception as e:
                     st.error("Lỗi kết nối cơ sở dữ liệu. Kết quả chỉ hiển thị cục bộ.")
 
-# --- TAB 2: CHATBOT TƯ VẤN (GROQ API + LLAMA 3) ---
+# --- TAB 2: CHATBOT TƯ VẤN (GROQ API + LLAMA 3.3) ---
 with tab2:
     st.header("Trợ lý An ninh mạng AI")
     st.markdown("Hệ thống kết nối trực tiếp với chip xử lý LPU của Groq, mang lại tốc độ phản hồi tính bằng mili-giây.")
@@ -114,9 +114,9 @@ with tab2:
 
             with st.chat_message("assistant"):
                 try:
-                    # Gọi API của Groq với mô hình Llama 3 70B siêu mạnh
+                    # ĐÃ CẬP NHẬT: Gọi API với mô hình Llama 3.3 mới nhất của hệ thống
                     stream = client.chat.completions.create(
-                        model="llama3-70b-8192",
+                        model="llama-3.3-70b-versatile",
                         messages=[
                             {"role": "system", "content": "Bạn là một chuyên gia an ninh mạng. Trả lời ngắn gọn, lập luận chặt chẽ, học thuật và dựa trên bối cảnh pháp luật Việt Nam. Viết hoàn toàn bằng tiếng Việt."},
                             {"role": "user", "content": prompt}
@@ -135,4 +135,4 @@ with tab2:
                     st.session_state.messages.append({"role": "assistant", "content": full_response})
                     
                 except Exception as e:
-                    st.error(f"⚠️ Hệ thống đang bảo trì: {str(e)}")
+                    st.error(f"⚠️ Lỗi hệ thống: {str(e)}")
