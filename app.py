@@ -21,12 +21,28 @@ supabase = init_connection()
 
 # Khởi tạo API Google ngay từ đầu
 api_key = st.secrets.get("GOOGLE_API_KEY")
+model = None
+
 if api_key:
     genai.configure(api_key=api_key)
-    # Sử dụng thẳng bản Flash siêu tốc
-    model = genai.GenerativeModel('gemini-1.5-flash')
-else:
-    model = None
+    
+    # CHIẾN THUẬT BULLETPROOF: Tự động quét và khóa mục tiêu (Model Scanner)
+    try:
+        # Ưu tiên 1: Quét tìm mô hình dòng 'Flash' để đảm bảo tốc độ tên lửa
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                if 'flash' in m.name.lower():
+                    model = genai.GenerativeModel(m.name)
+                    break
+                    
+        # Ưu tiên 2: Phương án dự phòng (Fallback) nếu tài khoản chưa được cấp Flash
+        if model is None:
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    model = genai.GenerativeModel(m.name)
+                    break
+    except Exception as e:
+        st.error(f"Lỗi truy xuất danh sách mô hình từ Google: {e}")
 
 # ==========================================
 # GIAO DIỆN CHÍNH
